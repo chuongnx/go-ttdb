@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/chuongnx/go-timesten/internal/cli"
@@ -141,7 +142,13 @@ func splitConnString(s string) []string {
 }
 
 // Connector creates connections with a fixed Config; use with sql.OpenDB.
-type Connector struct{ cfg Config }
+type Connector struct {
+	cfg Config
+	// lostAt is when a connection of this connector last saw a connection-level failure (unix ns).
+	// Connections created before it are checked before reuse (see Conn.ResetSession), so a network
+	// failure costs the application one error instead of one per pooled connection.
+	lostAt atomic.Int64
+}
 
 // NewConnector validates cfg and fills defaults.
 func NewConnector(cfg Config) (*Connector, error) {
@@ -194,6 +201,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, r.err
 	}
 	conn := newConn(r.cc, &c.cfg)
+	conn.conr, conn.created = c, time.Now().UnixNano()
 	for _, q := range c.cfg.InitSQL {
 		if _, err := conn.ExecContext(ctx, q, nil); err != nil {
 			conn.Close()

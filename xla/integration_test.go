@@ -355,3 +355,15 @@ func BenchmarkReadInserts(b *testing.B) {
 	}
 	b.ReportMetric(float64(total)/b.Elapsed().Seconds(), "records/s")
 }
+
+// NUMBER / FLOAT values between -1 and 1 come with a leading zero ("0.25", not TimesTen's ".25").
+func TestDecodeDecimalLeadingZero(t *testing.T) {
+	db, tbl, r, _ := setup(t, "ID TT_INTEGER NOT NULL PRIMARY KEY, AMT NUMBER(12,2), N NUMBER, F FLOAT(10)")
+	ttxtest.Exec(t, db, "INSERT INTO "+tbl+" VALUES (1, 0.25, -0.5, 0.125)")
+	rec := collect(t, r, tbl, 1)[0]
+	for col, want := range map[string]string{"AMT": "0.25", "N": "-0.5", "F": "0.125"} {
+		if v, _ := rec.NewValue(col); v.Kind != xla.KindDecimal || v.Text != want {
+			t.Errorf("%s = %q (kind %d), want %q", col, v.Text, v.Kind, want)
+		}
+	}
+}

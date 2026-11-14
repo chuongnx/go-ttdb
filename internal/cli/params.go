@@ -242,12 +242,25 @@ func (s *Stmt) bindOne(n int, p Param, loc *time.Location) (*paramBuf, error) {
 			cType, sqlType = C.SQL_C_BINARY, C.SQL_VARBINARY
 			pb.size = size
 		}
+		// PL/SQL takes at most 32767 bytes through a VARCHAR/VARBINARY bind; a longer input is
+		// bound as a LOB type so it reaches CLOB/BLOB variables and columns intact.
+		long := p.Dir == In && len(data) > DefaultOutSize
+		if long {
+			if kind == KindString {
+				sqlType = C.SQL_LONGVARCHAR
+			} else {
+				sqlType = C.SQL_LONGVARBINARY
+			}
+		}
 		pb.buf = cmalloc(pb.size)
 		if len(data) > 0 {
 			C.memcpy(pb.buf, unsafe.Pointer(&data[0]), C.size_t(len(data)))
 		}
 		colSize = C.SQLULEN(max(size, 1))
 		bufLen = C.SQLLEN(pb.size)
+		if long {
+			bufLen = C.SQLLEN(len(data)) // input only: no room for a terminator, which LOB binds would store
+		}
 		if p.Dir == Out || inKind == KindNull {
 			pb.ind = newInd(sqlNullData)
 		} else {

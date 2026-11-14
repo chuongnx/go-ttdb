@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"time"
 
 	"github.com/chuongnx/go-timesten/internal/cli"
+	"github.com/chuongnx/go-timesten/tt"
 )
 
 // Stmt is a statement prepared with database/sql's Prepare.
@@ -161,16 +163,38 @@ func outKind(dest any) (cli.Kind, error) {
 	return 0, fmt.Errorf("unsupported destination %T", dest)
 }
 
+// bindAndExecute binds ps and executes st. A statement invalidated by DDL since it was prepared
+// (cached statements, db.Prepare) fails with TimesTen error 946 before anything runs: it is
+// prepared again and executed once more.
+func (c *Conn) bindAndExecute(ctx context.Context, st *cli.Stmt, ps []cli.Param) error {
+	exec := func() error {
+		if err := st.BindParams(ps, c.cfg.Location); err != nil {
+			return err
+		}
+		return run(ctx, st, st.Execute)
+	}
+	err := exec()
+	if isInvalidated(err) && ctx.Err() == nil {
+		if perr := st.Reprepare(); perr != nil {
+			return perr
+		}
+		err = exec()
+	}
+	return err
+}
+
+func isInvalidated(err error) bool {
+	var te *tt.Error
+	return errors.As(err, &te) && te.Has(tt.ErrCommandInvalid)
+}
+
 func (c *Conn) execStmt(ctx context.Context, st *cli.Stmt, args []driver.NamedValue) (driver.Result, error) {
 	ps, outs, err := toParams(args)
 	if err != nil {
 		return nil, err
 	}
 	defer st.ResetParams()
-	if err := st.BindParams(ps, c.cfg.Location); err != nil {
-		return nil, err
-	}
-	if err := run(ctx, st, st.Execute); err != nil {
+	if err := c.bindAndExecute(ctx, st, ps); err != nil {
 		st.CloseCursor()
 		return nil, err
 	}
@@ -205,11 +229,7 @@ func (c *Conn) queryStmt(ctx context.Context, st *cli.Stmt, args []driver.NamedV
 	if len(outs) > 0 {
 		return nil, fmt.Errorf("ttsql: OUT parameters are only supported with Exec")
 	}
-	if err := st.BindParams(ps, c.cfg.Location); err != nil {
-		st.ResetParams()
-		return nil, err
-	}
-	err = run(ctx, st, st.Execute)
+	err = c.bindAndExecute(ctx, st, ps)
 	st.ResetParams()
 	if err != nil {
 		st.CloseCursor()

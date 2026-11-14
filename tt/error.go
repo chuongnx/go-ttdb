@@ -71,6 +71,7 @@ const (
 	ErrXlaTableDiff       = 8037  // table definition changed
 	ErrXlaDedicatedConn   = 8047  // connection is dedicated to XLA
 	ErrStatementCancelled = 6113  // statement cancelled (SQLCancel / context cancellation)
+	ErrCommandInvalid     = 946   // prepared statement invalidated by DDL on an object it uses
 )
 
 // Has reports whether any diagnostic record carries the native error code.
@@ -104,6 +105,11 @@ func (e *Error) IsConnectionLost() bool {
 	}
 	return false
 }
+
+// ErrClientCLOB is wrapped by the error returned for a CLOB value that the TimesTen client driver
+// delivered corrupted: multibyte text over 4 KB read over a client/server connection. Store such text
+// as NCLOB or VARCHAR2 (up to 4 MB), or read it over a direct connection.
+var ErrClientCLOB = errors.New("CLOB corrupted by the TimesTen client driver")
 
 // Code returns the native TimesTen error number of err, or 0 when err is not a *Error.
 func Code(err error) int {

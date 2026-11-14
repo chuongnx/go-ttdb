@@ -6,9 +6,12 @@ package cli
 import "C"
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 	"unsafe"
+
+	"github.com/chuongnx/go-timesten/tt"
 )
 
 // Column describes one result column.
@@ -243,7 +246,12 @@ func (r *Rowset) boundRow(dest []any, row int) error {
 				return fmt.Errorf("timesten: column %s truncated", c.Name)
 			}
 			dest[i] = C.GoBytes(p, C.int(ind))
-		default: // string / decimal text
+		case KindDecimal:
+			if int(ind) > c.elem-1 {
+				return fmt.Errorf("timesten: column %s truncated (%d bytes)", c.Name, ind)
+			}
+			dest[i] = NormalizeDecimal(string(C.GoBytes(p, C.int(ind))))
+		default: // string
 			if int(ind) > c.elem-1 {
 				return fmt.Errorf("timesten: column %s truncated (%d bytes)", c.Name, ind)
 			}
@@ -296,6 +304,11 @@ func (s *Stmt) getData(col int, c *Column, loc *time.Location) (any, error) {
 	text := c.cType == C.SQL_C_CHAR
 	var out []byte
 	for {
+		if text {
+			// 0xFF never occurs in UTF-8: what the driver did not overwrite stays 0xFF, so the
+			// terminator of a piece is the last NUL before that tail (see textPieceLen).
+			C.memset(buf, 0xFF, getDataChunk)
+		}
 		rc := C.SQLGetData(s.h, C.SQLUSMALLINT(col), c.cType, C.SQLPOINTER(buf), getDataChunk, &ind)
 		if rc == sqlNoData {
 			break
@@ -306,20 +319,39 @@ func (s *Stmt) getData(col int, c *Column, loc *time.Location) (any, error) {
 		if ind == sqlNullData {
 			return nil, nil
 		}
-		n := getDataChunk
-		if text {
-			n-- // terminator
-		}
-		if ind != C.SQL_NO_TOTAL && int(ind) <= n {
-			n = int(ind)
+		var n int
+		switch {
+		case rc == C.SQL_SUCCESS && ind != C.SQL_NO_TOTAL && int(ind) < getDataChunk:
+			n = int(ind) // last piece, exact length
+		case text:
+			// A truncated piece holds only whole characters, so it can be shorter than the buffer;
+			// LOBs report SQL_NO_TOTAL instead of a length.
+			n = textPieceLen(unsafe.Slice((*byte)(buf), getDataChunk))
+		default:
+			n = getDataChunk
+			if ind != C.SQL_NO_TOTAL && int(ind) < n {
+				n = int(ind)
+			}
 		}
 		out = append(out, C.GoBytes(buf, C.int(n))...)
-		if rc == C.SQL_SUCCESS {
-			break
-		}
+		// Keep reading until SQL_NO_DATA rather than stopping at SQL_SUCCESS: the TimesTen client
+		// driver returns SQL_SUCCESS for a piece cut short at a character boundary although more
+		// data follows. After the real last piece the next call returns SQL_NO_DATA.
 	}
 	if out == nil {
 		out = []byte{}
+	}
+	if c.SQLType == C.SQL_LONGVARCHAR && s.conn.client && bytes.IndexByte(out, 0) >= 0 {
+		// The TimesTen client driver delivers CLOB text in 4 KB pages and garbles multibyte
+		// characters that straddle a page (NUL padding, lost bytes). The value cannot be repaired;
+		// fail instead of returning corrupted text. Direct connections, NCLOB and VARCHAR2 are not
+		// affected.
+		return nil, fmt.Errorf("timesten: CLOB column %s over a client/server connection came back corrupted "+
+			"(TimesTen client driver, multibyte text over 4 KB); store such text as NCLOB or VARCHAR2 "+
+			"(up to 4 MB), or read it over a direct connection: %w", c.Name, tt.ErrClientCLOB)
+	}
+	if c.Kind == KindDecimal {
+		return NormalizeDecimal(string(out)), nil
 	}
 	if text {
 		return string(out), nil

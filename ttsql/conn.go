@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/chuongnx/go-timesten/internal/cli"
 	"github.com/chuongnx/go-timesten/tt"
@@ -30,6 +31,10 @@ type Conn struct {
 	isoSet  bool
 	cache   *stmtCache
 	cursors map[*Cursor]struct{}
+
+	conr      *Connector // nil for connections not made by a Connector
+	created   int64      // unix ns
+	checkedAt int64      // unix ns of the last successful liveness check
 }
 
 var (
@@ -52,6 +57,9 @@ func newConn(cc *cli.Conn, cfg *Config) *Conn {
 func (c *Conn) note(err error) error {
 	if err != nil && tt.IsConnectionLost(err) {
 		c.bad = true
+		if c.conr != nil {
+			c.conr.lostAt.Store(time.Now().UnixNano())
+		}
 	}
 	return err
 }
@@ -276,6 +284,35 @@ func (c *Conn) ResetSession(ctx context.Context) error {
 		c.cc.SetAutoCommit(true)
 		c.inTx = false
 	}
+	// Another connection of the pool lost its connection after this one was opened (network
+	// failure, server restart): check this one before handing it out. ErrBadConn makes database/sql
+	// discard it and use another connection, without an error reaching the application.
+	if c.conr != nil {
+		if lost := c.conr.lostAt.Load(); lost > c.created && lost > c.checkedAt {
+			if err := c.alive(); err != nil {
+				c.bad = true
+				return driver.ErrBadConn
+			}
+			c.checkedAt = time.Now().UnixNano()
+		}
+	}
+	return nil
+}
+
+// alive runs a trivial query on the connection.
+func (c *Conn) alive() error {
+	st, err := c.cc.NewStmt()
+	if err != nil {
+		return err
+	}
+	defer st.Free()
+	if err := st.Prepare("SELECT 1 FROM DUAL"); err != nil {
+		return err
+	}
+	if err := st.Execute(); err != nil {
+		return err
+	}
+	st.CloseCursor()
 	return nil
 }
 
@@ -286,6 +323,10 @@ func (c *Conn) CheckNamedValue(nv *driver.NamedValue) error {
 	}
 	return driver.ErrSkip
 }
+
+// IsClientServer reports whether the connection goes through the TimesTen client driver
+// (client/server) rather than a direct connection.
+func (c *Conn) IsClientServer() bool { return c.cc.IsClientServer() }
 
 // InTx reports whether a transaction started with BeginTx is open.
 func (c *Conn) InTx() bool {
@@ -321,6 +362,7 @@ func (c *Conn) ExecBatch(ctx context.Context, query string, rows [][]any) (int64
 	}
 	defer release()
 	var total int64
+	reprepared := false
 	for start := 0; start < len(norm); start += c.cfg.BatchRows {
 		end := min(start+c.cfg.BatchRows, len(norm))
 		var n int64
@@ -329,10 +371,23 @@ func (c *Conn) ExecBatch(ctx context.Context, query string, rows [][]any) (int64
 			n, e = st.ExecArray(norm[start:end], c.cfg.Location)
 			return e
 		})
+		if err != nil && start == 0 && !reprepared && isInvalidated(err) && ctx.Err() == nil {
+			// cached statement invalidated by DDL: nothing ran; prepare again and redo the chunk
+			reprepared = true
+			if perr := st.Reprepare(); perr != nil {
+				return total, c.note(perr)
+			}
+			start -= c.cfg.BatchRows
+			continue
+		}
 		if err != nil {
 			var be *cli.BatchError
 			if errors.As(err, &be) {
-				return total, c.note(&BatchError{Row: start + be.Row, Err: be.Err})
+				berr := be.Err
+				if ctx.Err() != nil {
+					berr = fmt.Errorf("%w: %w", ctx.Err(), be.Err)
+				}
+				return total, c.note(&BatchError{Row: start + be.Row, Err: berr})
 			}
 			return total, c.note(err)
 		}

@@ -84,6 +84,7 @@ func SharedEnv() (*Env, error) {
 type Conn struct {
 	h      C.SQLHDBC
 	closed bool
+	client bool // served by the TimesTen client driver (client/server connection)
 }
 
 // Connect opens a connection with a TimesTen connection string ("DSN=...;UID=...;PWD=...").
@@ -102,7 +103,24 @@ func (e *Env) Connect(connStr string) (*Conn, error) {
 		C.SQLFreeHandle(C.SQL_HANDLE_DBC, h)
 		return nil, err
 	}
-	return &Conn{h: C.SQLHDBC(h)}, nil
+	c := &Conn{h: C.SQLHDBC(h)}
+	c.client = strings.Contains(c.DriverName(), "ttclient")
+	return c, nil
+}
+
+// IsClientServer reports whether the connection goes through the TimesTen client driver.
+func (c *Conn) IsClientServer() bool {
+	return c.client
+}
+
+// DriverName returns SQL_DRIVER_NAME of the connection (the library actually serving it).
+func (c *Conn) DriverName() string {
+	var buf [256]C.SQLCHAR
+	var n C.SQLSMALLINT
+	if rc := C.SQLGetInfo(c.h, C.SQL_DRIVER_NAME, C.SQLPOINTER(&buf[0]), C.SQLSMALLINT(len(buf)), &n); !ok(rc) {
+		return ""
+	}
+	return C.GoStringN((*C.char)(unsafe.Pointer(&buf[0])), C.int(n))
 }
 
 func (c *Conn) err(op string) error { return diag(op, C.SQL_HANDLE_DBC, C.SQLHANDLE(c.h)) }
@@ -200,6 +218,7 @@ type Stmt struct {
 	params   []*paramBuf
 	cancelMu sync.Mutex // guards h against Cancel racing with Free
 	freed    bool
+	query    string // last prepared text, for Reprepare
 }
 
 func (s *Stmt) err(op string) error { return diag(op, C.SQL_HANDLE_STMT, C.SQLHANDLE(s.h)) }
@@ -211,7 +230,15 @@ func (s *Stmt) Prepare(query string) error {
 	if rc := C.SQLPrepare(s.h, (*C.SQLCHAR)(unsafe.Pointer(q)), C.SQL_NTS); !ok(rc) {
 		return s.err("SQLPrepare")
 	}
+	s.query = query
 	return nil
+}
+
+// Reprepare prepares the statement's text again, for a statement invalidated by DDL on an object
+// it uses (TimesTen error 946). Parameter bindings are released.
+func (s *Stmt) Reprepare() error {
+	s.ResetParams()
+	return s.Prepare(s.query)
 }
 
 // Execute runs a prepared statement. A statement that returns no rows to delete/update returns

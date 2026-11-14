@@ -421,7 +421,6 @@ func (x *Xla) decode(r *C.ttXlaUpdateDesc_t) (XRecord, error) {
 		td := (*C.ttXlaTblDesc_t)(tup1)
 		rec.Owner, rec.Name = cName(td.tblOwner[:]), cName(td.tblName[:])
 	case XlaAddColumns, XlaDropColumns, XlaCreateIndex, XlaDropIndex:
-		delete(x.tables, rec.SysTableID)
 		if rec.Type == XlaCreateIndex {
 			tp := (*C.ttXlaCreateIndexTup_t)(tup1)
 			rec.Owner, rec.Name = cName(tp.tblOwner[:]), cName(tp.tblName[:])
@@ -429,11 +428,17 @@ func (x *Xla) decode(r *C.ttXlaUpdateDesc_t) (XRecord, error) {
 			tp := (*C.ttXlaDropIndexTup_t)(tup1)
 			rec.Owner, rec.Name = cName(tp.tblOwner[:]), cName(tp.tblName[:])
 		} else {
-			var ver C.ttXlaTblVerDesc_t
-			if rc := C.ttXlaVersionTableInfo(x.h, r, &ver); ok(rc) {
+			// The record carries no table name: take it from the table already seen, else from
+			// the record's version, else from the current definition.
+			if t := x.tables[rec.SysTableID]; t != nil {
+				rec.Owner, rec.Name = t.Owner, t.Name
+			} else if ver := (C.ttXlaTblVerDesc_t{}); ok(C.ttXlaVersionTableInfo(x.h, r, &ver)) {
 				rec.Owner, rec.Name = cName(ver.tblDesc.tblOwner[:]), cName(ver.tblDesc.tblName[:])
+			} else if td := (C.ttXlaTblDesc_t{}); ok(C.ttXlaGetTableInfo(x.h, C.SQLUBIGINT(rec.SysTableID), 0, &td)) {
+				rec.Owner, rec.Name = cName(td.tblOwner[:]), cName(td.tblName[:])
 			}
 		}
+		delete(x.tables, rec.SysTableID)
 	}
 	return rec, nil
 }
@@ -512,12 +517,12 @@ func (x *Xla) decodeValue(c *XColumn, tup unsafe.Pointer) (XValue, error) {
 		if rc := C.ttXlaNumberToCString(x.h, col, &buf[0], C.int(len(buf))); !ok(rc) {
 			return XValue{}, x.err("ttXlaNumberToCString")
 		}
-		return XValue{Kind: KindDecimal, Str: C.GoString(&buf[0])}, nil
+		return XValue{Kind: KindDecimal, Str: NormalizeDecimal(C.GoString(&buf[0]))}, nil
 	case TTXLA_DECIMAL_TT:
 		if rc := C.ttXlaDecimalToCString(col, &buf[0], C.SQLSMALLINT(c.Precision), C.SQLSMALLINT(c.Scale)); !ok(rc) {
 			return XValue{}, x.err("ttXlaDecimalToCString")
 		}
-		return XValue{Kind: KindDecimal, Str: C.GoString(&buf[0])}, nil
+		return XValue{Kind: KindDecimal, Str: NormalizeDecimal(C.GoString(&buf[0]))}, nil
 	case TTXLA_DATE, TTXLA_TIMESTAMP, TTXLA_TIMESTAMP_TT:
 		var ts C.TIMESTAMP_STRUCT
 		var rc C.SQLRETURN
