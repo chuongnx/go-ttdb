@@ -1,3 +1,5 @@
+//go:build !tt_client && !darwin
+
 // Package xla reads committed changes from the TimesTen transaction log (XLA).
 //
 //	r, err := xla.Open(ctx, "DSN=sampledb;UID=xlauser;PWD=secret", "my_bookmark")

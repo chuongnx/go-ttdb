@@ -37,6 +37,11 @@ Linked library (build tags):
 | `tt_direct` | `libtten` | ✓ | – | ✓ |
 | `tt_client` | `libttclient` | – | ✓ | – |
 
+macOS: TimesTen ships only the client there (no `tt_xla.h`, no `libttdrvmgr`), so darwin builds link
+`libttclient` and leave out XLA (`xla`, `examples/xla-tail`) automatically. `LD_LIBRARY_PATH` is not used
+on macOS; add an rpath instead:
+`export CGO_LDFLAGS="-L$TIMESTEN_HOME/install/lib -Wl,-rpath,$TIMESTEN_HOME/install/lib"`.
+
 ## database/sql
 
 ```go

@@ -6,7 +6,6 @@
 #include <timesten.h>
 #include <sql.h>
 #include <sqlext.h>
-#include <tt_xla.h>
 
 /* Attribute setters taking integer values (avoids integer→pointer conversions in Go). */
 SQLRETURN gtt_set_env_int(SQLHENV h, SQLINTEGER attr, SQLLEN v);

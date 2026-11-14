@@ -1,7 +1,10 @@
+//go:build !tt_client && !darwin
+
 package cli
 
 /*
 #include "cli.h"
+#include <tt_xla.h>
 
 // Accessors that keep pointer arithmetic on XLA buffers in C.
 static ttXlaUpdateDesc_t *gtt_xla_rec(ttXlaUpdateDesc_t **arr, int i) { return arr[i]; }

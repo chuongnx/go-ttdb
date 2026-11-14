@@ -1,3 +1,5 @@
+//go:build !tt_client && !darwin
+
 // xla-tail prints committed changes of TimesTen tables as JSON lines.
 //
 //	xla-tail -dsn "DSN=sampledb;UID=xlauser;PWD=secret" -bookmark tail1 APP.ORDERS APP.ITEMS

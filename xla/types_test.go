@@ -1,3 +1,5 @@
+//go:build !tt_client && !darwin
+
 package xla
 
 import (

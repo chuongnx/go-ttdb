@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !tt_client && !darwin
 
 package xla_test
 
