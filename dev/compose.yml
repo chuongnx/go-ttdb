@@ -1,0 +1,20 @@
+name: go-timesten-dev
+services:
+  tt:
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile
+      args:
+        TT_IMAGE: ${TT_IMAGE:-xla-data-sync-xla-data-service:latest}
+    image: go-timesten-dev:latest
+    container_name: go-timesten-dev
+    stop_grace_period: 30s
+    volumes:
+      - ..:/src
+      - tt_instance:/usr/tt/instance1
+      - gocache:/home/oracle/.cache
+      - gomod:/home/oracle/go
+volumes:
+  tt_instance:
+  gocache:
+  gomod:

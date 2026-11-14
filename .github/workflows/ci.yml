@@ -1,0 +1,31 @@
+# CI: lint + unit + integration tests inside the TimesTen dev image.
+#
+# The dev image is built FROM a private TimesTen image (TT_IMAGE build arg); TimesTen is not
+# redistributable, so the runner must be able to pull it (self-hosted runner or a private registry).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        runner: [self-hosted-linux-amd64, self-hosted-linux-arm64]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start TimesTen dev container
+        run: make dev-up
+        env:
+          TT_IMAGE: ${{ vars.TT_IMAGE }}
+      - name: Lint
+        run: make lint
+      - name: Integration tests (race, cgocheck)
+        run: make race
+      - name: Benchmarks (smoke)
+        run: make bench
+      - name: Stop
+        if: always()
+        run: make dev-down
