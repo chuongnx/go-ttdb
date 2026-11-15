@@ -170,12 +170,19 @@ func (s *Stmt) ExecArray(rows [][]any, loc *time.Location) (int64, error) {
 	// No SQL_ATTR_PARAM_STATUS_PTR: TimesTen 22.1 frees an application-supplied status array itself when
 	// a row of the array fails (double free / heap corruption, reproduced by
 	// TestBatchTruncationErrorRepeated). The failing row is the last one processed.
-	processed := (*C.SQLULEN)(cmalloc(int(unsafe.Sizeof(C.SQLULEN(0)))))
+	//
+	// The processed-rows counter lives as long as the statement handle. The TimesTen 22.1 client
+	// driver ignores SQLSetStmtAttr(SQL_ATTR_PARAMS_PROCESSED_PTR, NULL) (it returns success and
+	// keeps the pointer), so every later SQLExecute of this statement still writes the count there:
+	// a counter freed after the batch would be written to after free (heap corruption, reproduced
+	// by TestStmtCacheAfterDDL over client/server under MALLOC_PERTURB_).
+	if s.processed == nil {
+		s.processed = (*C.SQLULEN)(cmalloc(int(unsafe.Sizeof(C.SQLULEN(0)))))
+	}
+	processed := s.processed
 	defer func() {
-		C.gtt_set_stmt_ptr(s.h, C.SQL_ATTR_PARAMS_PROCESSED_PTR, nil)
 		C.gtt_set_stmt_int(s.h, C.SQL_ATTR_PARAMSET_SIZE, 1)
 		C.SQLFreeStmt(s.h, C.SQL_RESET_PARAMS)
-		C.free(unsafe.Pointer(processed))
 	}()
 	*processed = 0
 	for _, a := range []struct {

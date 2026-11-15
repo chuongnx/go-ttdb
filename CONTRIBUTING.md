@@ -39,7 +39,7 @@ Examples:
 export TT_IMAGE=my-timesten:22.1
 make dev-up        # builds the image (adds gcc and Go), starts it, creates database "gotest"
 make test          # unit tests
-make race          # integration tests with -race and cgocheck
+make race          # integration tests with -race, cgocheck and glibc heap checking
 make ci            # everything a pull request must pass: lint, race, race-cs, netfaults
 make dev-down
 ```

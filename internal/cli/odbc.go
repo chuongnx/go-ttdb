@@ -213,12 +213,15 @@ func (c *Conn) NewStmt() (*Stmt, error) {
 
 // Stmt is one ODBC statement handle plus the C buffers bound to it.
 type Stmt struct {
-	conn     *Conn
-	h        C.SQLHSTMT
-	params   []*paramBuf
-	cancelMu sync.Mutex // guards h against Cancel racing with Free
-	freed    bool
-	query    string // last prepared text, for Reprepare
+	conn   *Conn
+	h      C.SQLHSTMT
+	params []*paramBuf
+	// processed receives the row count of array executions (ExecArray). Once handed to the driver it
+	// stays bound until the handle is freed; see ExecArray.
+	processed *C.SQLULEN
+	cancelMu  sync.Mutex // guards h against Cancel racing with Free
+	freed     bool
+	query     string // last prepared text, for Reprepare
 }
 
 func (s *Stmt) err(op string) error { return diag(op, C.SQL_HANDLE_STMT, C.SQLHANDLE(s.h)) }
@@ -336,4 +339,8 @@ func (s *Stmt) Free() {
 	}
 	s.params = nil
 	C.SQLFreeHandle(C.SQL_HANDLE_STMT, C.SQLHANDLE(s.h))
+	if s.processed != nil { // only after the handle is gone: the driver writes to it on every execute
+		C.free(unsafe.Pointer(s.processed))
+		s.processed = nil
+	}
 }

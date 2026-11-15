@@ -27,7 +27,7 @@ and user `gotest` / `gotest`. TimesTen cannot be redistributed, so you provide t
 export TT_IMAGE=my-timesten:22.1
 make dev-up      # build and start; creates the gotest database on first start
 make test        # unit tests
-make race        # integration tests with -race and cgocheck
+make race        # integration tests with -race, cgocheck and glibc heap checking
 make dev-down    # stop (the database volume is kept)
 ```
 
@@ -40,7 +40,7 @@ shell in the container.
 |---|---|
 | `make test` | unit tests |
 | `make itest` | integration tests, direct connection |
-| `make race` | integration tests with `-race` and `GODEBUG=cgocheck=1` |
+| `make race` | integration tests with `-race`, `GODEBUG=cgocheck=1` and glibc heap checking (`MALLOC_CHECK_=3 MALLOC_PERTURB_=165`: a bad free or a use-after-free in the C layer or the TimesTen driver fails every run) |
 | `make itest-cs` / `make race-cs` | `ttsql` integration tests over client/server (the container's own server, port 6625) |
 | `make netfaults` | client/server network failures through an in-test TCP proxy |
 | `make bench` / `make bench-cs` | `ExecBatch` and XLA throughput |

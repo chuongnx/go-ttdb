@@ -6,9 +6,9 @@
 #   make dev-up        build and start the container (TT_IMAGE=<your TimesTen image>)
 #   make test          unit tests            (in the container)
 #   make itest         integration tests     (in the container, real database, direct connection)
-#   make race          integration tests with -race and cgocheck
+#   make race          integration tests with -race, cgocheck and glibc heap checking
 #   make itest-cs      integration tests over a client/server connection (same database)
-#   make race-cs       the same with -race and cgocheck
+#   make race-cs       the same with -race, cgocheck and glibc heap checking
 #   make netfaults     client/server network failures through an in-test TCP proxy
 #   make bench         benchmarks (direct)
 #   make bench-cs      benchmarks over client/server
@@ -29,6 +29,10 @@ SOAK      ?= 30m
 CS_CONN   ?= TTC_SERVER_DSN=gotest;UID=gotest;PWD=gotest
 CS_ENV     = TIMESTEN_DSN="TTC_SERVER=localhost/6625;$(CS_CONN)" \
              TIMESTEN_CS_SERVER=localhost:6625 TIMESTEN_CS_CONN="$(CS_CONN)"
+
+# glibc heap checking for the race targets: abort on an invalid free and poison freed memory, so a
+# use-after-free in the C layer or in the TimesTen driver fails every run instead of now and then.
+HEAPCHECK  = MALLOC_CHECK_=3 MALLOC_PERTURB_=165
 
 .PHONY: dev-up dev-down dev-shell test itest race itest-cs race-cs netfaults bench bench-cs \
 	faults soak lint ci test-host itest-host
@@ -51,14 +55,14 @@ itest:
 	$(EXEC) 'cd /src && go test -tags integration -count=1 $(PKGS)'
 
 race:
-	$(EXEC) 'cd /src && GODEBUG=cgocheck=1 go test -race -tags integration -count=1 $(PKGS)'
+	$(EXEC) 'cd /src && $(HEAPCHECK) GODEBUG=cgocheck=1 go test -race -tags integration -count=1 $(PKGS)'
 
 # client/server: ttsql only (XLA needs a direct connection)
 itest-cs:
 	$(EXEC) 'cd /src && $(CS_ENV) go test -tags integration -count=1 ./ttsql/'
 
 race-cs:
-	$(EXEC) 'cd /src && $(CS_ENV) GODEBUG=cgocheck=1 go test -race -tags integration -count=1 ./ttsql/'
+	$(EXEC) 'cd /src && $(CS_ENV) $(HEAPCHECK) GODEBUG=cgocheck=1 go test -race -tags integration -count=1 ./ttsql/'
 
 netfaults:
 	$(EXEC) 'cd /src && $(CS_ENV) go test -tags integration -run NetFault -count=1 -v ./ttsql/'
