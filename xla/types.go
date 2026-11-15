@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/chuongnx/go-timesten/internal/cli"
+	"github.com/chuongnx/go-ttdb/internal/cli"
 )
 
 // Op is the kind of a transaction log record.

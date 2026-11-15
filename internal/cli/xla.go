@@ -21,7 +21,7 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
-	"github.com/chuongnx/go-timesten/tt"
+	"github.com/chuongnx/go-ttdb/tt"
 )
 
 // XLA open options (ttXlaPersistOpen).

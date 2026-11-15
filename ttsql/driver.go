@@ -1,6 +1,6 @@
 // Package ttsql is a database/sql driver for Oracle TimesTen (ODBC/CLI over cgo).
 //
-//	import _ "github.com/chuongnx/go-timesten/ttsql"
+//	import _ "github.com/chuongnx/go-ttdb/ttsql"
 //	db, err := sql.Open("timesten", "DSN=sampledb;UID=app;PWD=secret")
 //
 // The data source name is a TimesTen connection string. Keys starting with "go_" configure the
@@ -30,7 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/chuongnx/go-timesten/internal/cli"
+	"github.com/chuongnx/go-ttdb/internal/cli"
 )
 
 // DriverName is the name registered with database/sql.

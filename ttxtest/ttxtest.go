@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/chuongnx/go-timesten/ttsql"
+	_ "github.com/chuongnx/go-ttdb/ttsql"
 )
 
 // DSN returns the test connection string or skips the test.

@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/chuongnx/go-timesten/ttsql"
+	"github.com/chuongnx/go-ttdb/ttsql"
 )
 
 func ttsqlBatch(ctx context.Context, conn *sql.Conn, q string, rows [][]any) error {

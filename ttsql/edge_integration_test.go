@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttsql"
-	"github.com/chuongnx/go-timesten/ttxtest"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttsql"
+	"github.com/chuongnx/go-ttdb/ttxtest"
 )
 
 // roundTrip inserts v into col of a fresh row and scans it back into dest.

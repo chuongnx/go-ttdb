@@ -1,7 +1,20 @@
 # Changelog
 
-## Unreleased (0.1.0)
+All notable changes to this project are documented in this file. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
+[Semantic Versioning](https://semver.org/) (pre-1.0: minor versions may change the API).
 
+## [Unreleased]
+
+## [0.1.0] - unreleased
+
+First public release.
+
+- Project renamed from go-timesten to **go-ttdb**; module path `github.com/chuongnx/go-ttdb`.
+  Package names (`ttsql`, `xla`, `xla/admin`, `tt`, `ttxtest`) and the driver name `"timesten"` are
+  unchanged.
+- Apache-2.0 license; documentation in `docs/`, Vietnamese README, contributing guide, security
+  policy, runnable examples on pkg.go.dev.
 - `ttsql`: database/sql driver over the TimesTen ODBC API (cgo) — connector with DSN options, pool
   validation and session reset, transactions (READ COMMITTED, SERIALIZABLE), statement cache,
   array fetch, all TimesTen data types incl. LOBs, OUT / IN OUT parameters (`sql.Out`), REF CURSOR

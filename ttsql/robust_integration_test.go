@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttsql"
-	"github.com/chuongnx/go-timesten/ttxtest"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttsql"
+	"github.com/chuongnx/go-ttdb/ttxtest"
 )
 
 // Statements cached per connection (Exec) and prepared by the caller (db.Prepare) keep working
@@ -272,7 +272,7 @@ func TestCancelVariants(t *testing.T) {
 		n, err := ttsql.ExecBatch(ctx, conn, "INSERT INTO "+tbl+" VALUES (?, ?)", rows)
 		t.Logf("batch stopped after %d rows: %v", n, err)
 		check("batch", err)
-		// autocommit: chunks completed before the cancel stay committed, nothing beyond n
+		// autocommit: rows applied before the cancel (also part of a chunk) stay committed, n counts them
 		var c int64
 		db.QueryRow("SELECT COUNT(*) FROM " + tbl).Scan(&c)
 		if c != n {

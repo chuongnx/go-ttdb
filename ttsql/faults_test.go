@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttxtest"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttxtest"
 )
 
 func sh(t *testing.T, cmd string) {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chuongnx/go-timesten/internal/cli"
+	"github.com/chuongnx/go-ttdb/internal/cli"
 )
 
 // Cursor receives a PL/SQL REF CURSOR OUT parameter:

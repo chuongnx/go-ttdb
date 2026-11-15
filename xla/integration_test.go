@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttxtest"
-	"github.com/chuongnx/go-timesten/xla"
-	"github.com/chuongnx/go-timesten/xla/admin"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttxtest"
+	"github.com/chuongnx/go-ttdb/xla"
+	"github.com/chuongnx/go-ttdb/xla/admin"
 )
 
 const owner = "GOTEST"

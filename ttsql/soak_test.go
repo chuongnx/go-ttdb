@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/ttsql"
-	"github.com/chuongnx/go-timesten/ttxtest"
+	"github.com/chuongnx/go-ttdb/ttsql"
+	"github.com/chuongnx/go-ttdb/ttxtest"
 )
 
 // rssBytes returns the private resident memory of the process. On Linux that is RssAnon: plain RSS

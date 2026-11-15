@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/chuongnx/go-timesten/tt"
+	"github.com/chuongnx/go-ttdb/tt"
 )
 
 // Column describes one result column.

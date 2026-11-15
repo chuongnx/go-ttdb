@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chuongnx/go-timesten/internal/cli"
-	"github.com/chuongnx/go-timesten/tt"
+	"github.com/chuongnx/go-ttdb/internal/cli"
+	"github.com/chuongnx/go-ttdb/tt"
 )
 
 // Conn is one TimesTen connection. Besides the database/sql driver interfaces it exposes
@@ -337,7 +337,9 @@ func (c *Conn) InTx() bool {
 
 // ExecBatch executes query once per row using ODBC parameter arrays (one driver round trip per
 // Config.BatchRows rows) and returns the total number of affected rows. It runs in the
-// connection's current transaction state. On failure the error is a *BatchError naming the row.
+// connection's current transaction state. On failure the error is a *BatchError naming the row, and
+// the count includes the rows applied before it (TimesTen keeps them, also inside the failing chunk).
+// Over client/server the failing chunk contributes its applied input rows, not their affected rows.
 func (c *Conn) ExecBatch(ctx context.Context, query string, rows [][]any) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -383,6 +385,7 @@ func (c *Conn) ExecBatch(ctx context.Context, query string, rows [][]any) (int64
 		if err != nil {
 			var be *cli.BatchError
 			if errors.As(err, &be) {
+				total += n // rows of this chunk applied before the failing row
 				berr := be.Err
 				if ctx.Err() != nil {
 					berr = fmt.Errorf("%w: %w", ctx.Err(), be.Err)

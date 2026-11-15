@@ -1,9 +1,9 @@
-# go-timesten — build and test targets.
+# go-ttdb — build and test targets.
 #
 # The library needs the TimesTen headers and libraries at build time (cgo). Locally, everything runs
 # inside the dev container (TimesTen + Go + gcc, own database "gotest"):
 #
-#   make dev-up        build and start the container
+#   make dev-up        build and start the container (TT_IMAGE=<your TimesTen image>)
 #   make test          unit tests            (in the container)
 #   make itest         integration tests     (in the container, real database, direct connection)
 #   make race          integration tests with -race and cgocheck
@@ -19,7 +19,7 @@
 #
 # On a host with TimesTen installed set TIMESTEN_HOME and use the *-host targets.
 
-DEV       ?= go-timesten-dev
+DEV       ?= go-ttdb-dev
 COMPOSE   ?= docker compose -f dev/compose.yml
 EXEC      ?= docker exec $(DEV) bash -lc
 PKGS      ?= ./...
@@ -34,6 +34,7 @@ CS_ENV     = TIMESTEN_DSN="TTC_SERVER=localhost/6625;$(CS_CONN)" \
 	faults soak lint ci test-host itest-host
 
 dev-up:
+	@test -n "$$TT_IMAGE" || { echo "set TT_IMAGE to a TimesTen 22.1 Classic image (see CONTRIBUTING.md)"; exit 1; }
 	$(COMPOSE) up -d --build
 	@$(EXEC) 'until ttIsql -v1 -connstr "$$TIMESTEN_DSN" -e "quit" >/dev/null 2>&1; do sleep 1; done; echo ready'
 

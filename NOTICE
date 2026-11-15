@@ -1,0 +1,11 @@
+go-ttdb
+Copyright 2026 Ngo Xuan Chuong
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Oracle, TimesTen and Java are registered trademarks of Oracle and/or its affiliates.
+go-ttdb is an independent project; it is not affiliated with, endorsed by or supported by Oracle.
+
+This repository does not contain or redistribute any part of Oracle TimesTen In-Memory Database.
+Building and running go-ttdb requires a TimesTen installation (headers and libraries) obtained
+from Oracle under Oracle's own license terms.

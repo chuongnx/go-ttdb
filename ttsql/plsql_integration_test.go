@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttsql"
-	"github.com/chuongnx/go-timesten/ttxtest"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttsql"
+	"github.com/chuongnx/go-ttdb/ttxtest"
 )
 
 const ordersColumns = `ID NUMBER(10) NOT NULL PRIMARY KEY,

@@ -1,9 +1,13 @@
-# Development / integration-test image: TimesTen Classic (from the xla-data-sync image) + gcc + Go.
+# Development / integration-test image: TimesTen Classic + gcc + Go.
 # Runs its own TimesTen instance and database — independent of any other container.
 #
-#   make dev-up      build + start (database "gotest" is created on first start)
-#   make itest       run integration tests inside it
-ARG TT_IMAGE=xla-data-sync-xla-data-service:latest
+# TT_IMAGE must be an image you build or pull yourself (TimesTen is not redistributable): an
+# Oracle Linux based image with TimesTen 22.1 Classic installed as instance /usr/tt/instance1, owned
+# by user oracle (group oinstall), with yum available. See CONTRIBUTING.md.
+#
+#   TT_IMAGE=my-timesten:22.1 make dev-up   build + start (database "gotest" is created on first start)
+#   make itest                              run integration tests inside it
+ARG TT_IMAGE
 ARG GO_IMAGE=golang:1.26
 
 FROM ${GO_IMAGE} AS go

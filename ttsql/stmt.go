@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/chuongnx/go-timesten/internal/cli"
-	"github.com/chuongnx/go-timesten/tt"
+	"github.com/chuongnx/go-ttdb/internal/cli"
+	"github.com/chuongnx/go-ttdb/tt"
 )
 
 // Stmt is a statement prepared with database/sql's Prepare.

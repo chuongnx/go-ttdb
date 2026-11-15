@@ -1,13 +1,13 @@
-name: go-timesten-dev
+name: go-ttdb-dev
 services:
   tt:
     build:
       context: ..
       dockerfile: dev/Dockerfile
       args:
-        TT_IMAGE: ${TT_IMAGE:-xla-data-sync-xla-data-service:latest}
-    image: go-timesten-dev:latest
-    container_name: go-timesten-dev
+        TT_IMAGE: ${TT_IMAGE:-}
+    image: go-ttdb-dev:latest
+    container_name: go-ttdb-dev
     stop_grace_period: 30s
     volumes:
       - ..:/src

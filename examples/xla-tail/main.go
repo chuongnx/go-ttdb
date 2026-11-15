@@ -20,7 +20,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chuongnx/go-timesten/xla"
+	"github.com/chuongnx/go-ttdb/xla"
 )
 
 type jsonRecord struct {

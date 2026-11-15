@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttsql"
-	"github.com/chuongnx/go-timesten/ttxtest"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttsql"
+	"github.com/chuongnx/go-ttdb/ttxtest"
 )
 
 func TestPingAndDual(t *testing.T) {
@@ -271,6 +271,94 @@ func TestBatchErrorRow(t *testing.T) {
 	if _, err := ttsql.ExecBatch(ctx, conn, "INSERT INTO "+tbl+" VALUES (?, ?)", [][]any{{1, "a"}, {"x", "b"}}); err == nil {
 		t.Error("mixed kinds accepted")
 	}
+}
+
+// Rows of the failing chunk that ran before the failing row stay applied (TimesTen does not undo
+// them), so the returned count includes them: n always equals what is in the table.
+func TestBatchErrorCountsPartialChunk(t *testing.T) {
+	db := ttxtest.DB(t)
+	ctx := context.Background()
+	count := func(q interface {
+		QueryRowContext(context.Context, string, ...any) *sql.Row
+	}, query string) int64 {
+		var c int64
+		if err := q.QueryRowContext(ctx, query).Scan(&c); err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	big := make([][]any, 2500)
+	for k := range big {
+		big[k] = []any{100 + k}
+	}
+	big[1500] = []any{100} // duplicate key, 476 rows into the second chunk
+
+	t.Run("autocommit insert", func(t *testing.T) {
+		tbl := ttxtest.Table(t, db, "ID TT_INTEGER NOT NULL PRIMARY KEY")
+		conn, _ := db.Conn(ctx)
+		defer conn.Close()
+		n, err := ttsql.ExecBatch(ctx, conn, "INSERT INTO "+tbl+" (ID) VALUES (?)", big)
+		if tt.Code(err) != tt.ErrKeyExists {
+			t.Fatalf("err = %v", err)
+		}
+		if c := count(db, "SELECT COUNT(*) FROM "+tbl); n != 1500 || c != n {
+			t.Errorf("reported %d, table %d, want 1500", n, c)
+		}
+	})
+
+	t.Run("transaction insert", func(t *testing.T) {
+		tbl := ttxtest.Table(t, db, "ID TT_INTEGER NOT NULL PRIMARY KEY")
+		conn, _ := db.Conn(ctx)
+		defer conn.Close()
+		tx, err := conn.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+		n, err := ttsql.ExecBatch(ctx, conn, "INSERT INTO "+tbl+" (ID) VALUES (?)", big)
+		if tt.Code(err) != tt.ErrKeyExists {
+			t.Fatalf("err = %v", err)
+		}
+		if c := count(tx, "SELECT COUNT(*) FROM "+tbl); n != 1500 || c != n {
+			t.Errorf("reported %d, in transaction %d, want 1500", n, c)
+		}
+	})
+
+	t.Run("update counts affected rows", func(t *testing.T) {
+		// two rows per group, so the count is affected rows, not input rows
+		tbl := ttxtest.Table(t, db, "ID TT_INTEGER NOT NULL PRIMARY KEY, G TT_INTEGER, V VARCHAR2(10) NOT NULL")
+		if _, err := db.ExecContext(ctx, "INSERT INTO "+tbl+" SELECT ROWNUM, (ROWNUM+1)/2, 'old' FROM SYS.COLUMNS a, SYS.COLUMNS b WHERE ROWNUM <= 3000"); err != nil {
+			t.Fatal(err)
+		}
+		if c := count(db, "SELECT COUNT(*) FROM "+tbl); c != 3000 {
+			t.Fatalf("seeded %d rows", c)
+		}
+		upd := make([][]any, 1500)
+		for k := range upd {
+			upd[k] = []any{"new", k + 1}
+		}
+		upd[1100] = []any{nil, 1101} // NOT NULL violation, 76 rows into the second chunk
+		conn, _ := db.Conn(ctx)
+		defer conn.Close()
+		n, err := ttsql.ExecBatch(ctx, conn, "UPDATE "+tbl+" SET V = ? WHERE G = ?", upd)
+		var be *ttsql.BatchError
+		if !errors.As(err, &be) || be.Row != 1100 {
+			t.Fatalf("err = %v", err)
+		}
+		c := count(db, "SELECT COUNT(*) FROM "+tbl+" WHERE V = 'new'")
+		if c != 2200 {
+			t.Fatalf("updated %d, want 2200", c)
+		}
+		// The client driver's SQLRowCount after a failed array counts the input rows processed, not
+		// the rows they affected: 2048 + 76 instead of 2048 + 152.
+		want := int64(2200)
+		if isClientServer(t, db) {
+			want = 2124
+		}
+		if n != want {
+			t.Errorf("reported %d, want %d", n, want)
+		}
+	})
 }
 
 func TestProceduresAndRefCursor(t *testing.T) {

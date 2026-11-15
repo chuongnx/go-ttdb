@@ -1,3 +1,3 @@
-module github.com/chuongnx/go-timesten
+module github.com/chuongnx/go-ttdb
 
 go 1.22

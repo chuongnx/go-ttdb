@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/chuongnx/go-timesten/ttsql"
+	"github.com/chuongnx/go-ttdb/ttsql"
 )
 
 func main() {

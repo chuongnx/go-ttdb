@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuongnx/go-timesten/tt"
-	"github.com/chuongnx/go-timesten/ttxtest"
-	"github.com/chuongnx/go-timesten/xla"
+	"github.com/chuongnx/go-ttdb/tt"
+	"github.com/chuongnx/go-ttdb/ttxtest"
+	"github.com/chuongnx/go-ttdb/xla"
 )
 
 // A reader whose database restarts: Next fails with a connection error; reopening the bookmark

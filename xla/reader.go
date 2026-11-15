@@ -28,8 +28,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chuongnx/go-timesten/internal/cli"
-	"github.com/chuongnx/go-timesten/tt"
+	"github.com/chuongnx/go-ttdb/internal/cli"
+	"github.com/chuongnx/go-ttdb/tt"
 )
 
 // OpenMode selects how the bookmark is opened.

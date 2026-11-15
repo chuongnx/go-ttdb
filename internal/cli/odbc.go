@@ -10,7 +10,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/chuongnx/go-timesten/tt"
+	"github.com/chuongnx/go-ttdb/tt"
 )
 
 // Return codes and constants re-exported for the other files of this package.

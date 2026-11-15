@@ -34,7 +34,8 @@ type arrayCol struct {
 // ExecArray executes the prepared statement once for every row using ODBC parameter arrays
 // (SQL_ATTR_PARAMSET_SIZE), binding by column. Values must already be normalized to nil, int64,
 // float64, bool, string, []byte or time.Time; one column must not mix kinds (int64 is widened to
-// float64 in a float column). It returns the total affected row count.
+// float64 in a float column). It returns the total affected row count; on a *BatchError the count
+// covers the rows applied before the failing row.
 func (s *Stmt) ExecArray(rows [][]any, loc *time.Location) (int64, error) {
 	n := len(rows)
 	if n == 0 {
@@ -190,10 +191,17 @@ func (s *Stmt) ExecArray(rows [][]any, loc *time.Location) (int64, error) {
 	}
 	if err := s.Execute(); err != nil {
 		row := -1
+		var affected int64
 		if p := int(*processed); p > 0 && p <= n {
 			row = p - 1
+			// The rows before the failing one stay applied (TimesTen does not undo them, in autocommit
+			// or in a transaction) and SQLRowCount reports their affected count (the client driver
+			// reports the number of input rows processed instead).
+			if a, rerr := s.RowCount(); rerr == nil && a > 0 {
+				affected = a
+			}
 		}
-		return 0, &BatchError{Row: row, Err: err}
+		return affected, &BatchError{Row: row, Err: err}
 	}
 	affected, err := s.RowCount()
 	s.CloseCursor()

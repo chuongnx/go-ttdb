@@ -1,7 +1,10 @@
-# CI: lint + unit + integration tests inside the TimesTen dev image.
+# CI: lint + integration tests (direct and client/server) inside the TimesTen dev image.
 #
-# The dev image is built FROM a private TimesTen image (TT_IMAGE build arg); TimesTen is not
-# redistributable, so the runner must be able to pull it (self-hosted runner or a private registry).
+# TimesTen is not redistributable, so this workflow cannot run on GitHub-hosted runners. It needs:
+#   - self-hosted runners labelled self-hosted-linux-amd64 / self-hosted-linux-arm64 with Docker, and
+#   - the repository variable TT_IMAGE naming a TimesTen 22.1 Classic image those runners can pull
+#     (see CONTRIBUTING.md, "The TimesTen image").
+# Without TT_IMAGE the job is skipped, so forks do not fail.
 name: ci
 on:
   push:
@@ -10,20 +13,26 @@ on:
 
 jobs:
   test:
+    if: ${{ vars.TT_IMAGE != '' }}
     strategy:
+      fail-fast: false
       matrix:
         runner: [self-hosted-linux-amd64, self-hosted-linux-arm64]
     runs-on: ${{ matrix.runner }}
+    env:
+      TT_IMAGE: ${{ vars.TT_IMAGE }}
     steps:
       - uses: actions/checkout@v4
       - name: Start TimesTen dev container
         run: make dev-up
-        env:
-          TT_IMAGE: ${{ vars.TT_IMAGE }}
       - name: Lint
         run: make lint
-      - name: Integration tests (race, cgocheck)
+      - name: Integration tests, direct (race, cgocheck)
         run: make race
+      - name: Integration tests, client/server (race, cgocheck)
+        run: make race-cs
+      - name: Network faults (client/server)
+        run: make netfaults
       - name: Benchmarks (smoke)
         run: make bench
       - name: Stop
